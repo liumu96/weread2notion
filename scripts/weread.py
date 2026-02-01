@@ -398,8 +398,8 @@ def get_database_id(client, notion_id):
     Get database ID. If a page ID is provided, find the first child database in the page.
     """
     try:
-        # 尝试作为数据库检索
-        # Try to retrieve as a database
+        # 尝试作为数据库检索（仅用于验证ID类型）
+        # Try to retrieve as a database (validation only)
         client.databases.retrieve(database_id=notion_id)
         print(f"✓ 检测到数据库ID: {notion_id}")
         return notion_id
@@ -409,8 +409,8 @@ def get_database_id(client, notion_id):
         print("不是数据库ID，尝试作为页面处理...")
     
     try:
-        # 尝试作为页面检索，并查找子数据库
-        # Try to retrieve as a page and find child databases
+        # 尝试作为页面检索，并查找子数据库（仅用于验证ID类型）
+        # Try to retrieve as a page and find child databases (validation only)
         client.pages.retrieve(page_id=notion_id)
         print(f"✓ 检测到页面ID，正在查找子数据库...")
         # 获取页面的子块
@@ -422,12 +422,11 @@ def get_database_id(client, notion_id):
                 print(f"✓ 找到子数据库: {database_id}")
                 return database_id
         raise DatabaseNotFoundError(f"页面 {notion_id} 中未找到数据库。请确保页面中包含至少一个数据库。")
-    except DatabaseNotFoundError:
-        raise
     except APIResponseError:
         print("无法作为页面处理，请检查ID是否有效")
     
     raise Exception(f"无法识别ID {notion_id} 的类型。请确保提供的是有效的Notion页面或数据库ID，并且已与集成共享。")
+
 
 
 
