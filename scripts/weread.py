@@ -386,6 +386,11 @@ def extract_page_id():
     else:
         raise Exception(f"获取NotionID失败，请检查输入的Url是否正确")
 
+class DatabaseNotFoundError(Exception):
+    """页面中未找到数据库 / Database not found in page"""
+    pass
+
+
 def get_database_id(client, notion_id):
     """
     获取数据库ID。如果提供的是页面ID，则查找页面中的第一个子数据库。
@@ -394,34 +399,33 @@ def get_database_id(client, notion_id):
     try:
         # 尝试作为数据库检索
         # Try to retrieve as a database
-        database = client.databases.retrieve(database_id=notion_id)
-        if database.get("object") == "database":
-            print(f"✓ 检测到数据库ID: {notion_id}")
-            return notion_id
+        client.databases.retrieve(database_id=notion_id)
+        print(f"✓ 检测到数据库ID: {notion_id}")
+        return notion_id
     except Exception as e:
         print(f"不是数据库ID，尝试作为页面处理: {e}")
     
     try:
         # 尝试作为页面检索，并查找子数据库
         # Try to retrieve as a page and find child databases
-        page = client.pages.retrieve(page_id=notion_id)
-        if page.get("object") == "page":
-            print(f"✓ 检测到页面ID，正在查找子数据库...")
-            # 获取页面的子块
-            # Get the page's child blocks
-            blocks = client.blocks.children.list(block_id=notion_id)
-            for block in blocks.get("results", []):
-                if block.get("type") == "child_database":
-                    database_id = block.get("id")
-                    print(f"✓ 找到子数据库: {database_id}")
-                    return database_id
-            raise Exception(f"页面 {notion_id} 中未找到数据库。请确保页面中包含至少一个数据库。")
+        client.pages.retrieve(page_id=notion_id)
+        print(f"✓ 检测到页面ID，正在查找子数据库...")
+        # 获取页面的子块
+        # Get the page's child blocks
+        blocks = client.blocks.children.list(block_id=notion_id)
+        for block in blocks.get("results", []):
+            if block.get("type") == "child_database":
+                database_id = block.get("id")
+                print(f"✓ 找到子数据库: {database_id}")
+                return database_id
+        raise DatabaseNotFoundError(f"页面 {notion_id} 中未找到数据库。请确保页面中包含至少一个数据库。")
+    except DatabaseNotFoundError:
+        raise
     except Exception as e:
-        if "未找到数据库" in str(e):
-            raise e
         print(f"无法作为页面处理: {e}")
     
     raise Exception(f"无法识别ID {notion_id} 的类型。请确保提供的是有效的Notion页面或数据库ID，并且已与集成共享。")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
