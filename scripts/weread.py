@@ -5,6 +5,7 @@ import os
 import re
 import time
 from notion_client import Client
+from notion_client.errors import APIResponseError
 import requests
 from requests.utils import cookiejar_from_dict
 from http.cookies import SimpleCookie
@@ -402,8 +403,10 @@ def get_database_id(client, notion_id):
         client.databases.retrieve(database_id=notion_id)
         print(f"✓ 检测到数据库ID: {notion_id}")
         return notion_id
-    except Exception as e:
-        print(f"不是数据库ID，尝试作为页面处理: {e}")
+    except APIResponseError:
+        # 不是数据库ID，尝试作为页面处理
+        # Not a database ID, try as a page
+        print("不是数据库ID，尝试作为页面处理...")
     
     try:
         # 尝试作为页面检索，并查找子数据库
@@ -421,10 +424,11 @@ def get_database_id(client, notion_id):
         raise DatabaseNotFoundError(f"页面 {notion_id} 中未找到数据库。请确保页面中包含至少一个数据库。")
     except DatabaseNotFoundError:
         raise
-    except Exception as e:
-        print(f"无法作为页面处理: {e}")
+    except APIResponseError:
+        print("无法作为页面处理，请检查ID是否有效")
     
     raise Exception(f"无法识别ID {notion_id} 的类型。请确保提供的是有效的Notion页面或数据库ID，并且已与集成共享。")
+
 
 
 if __name__ == "__main__":
