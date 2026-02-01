@@ -388,7 +388,7 @@ def extract_page_id():
         raise Exception(f"获取NotionID失败，请检查输入的Url是否正确")
 
 class DatabaseNotFoundError(Exception):
-    """页面中未找到数据库 / Database not found in page"""
+    """数据库未找到或无法访问 / Database not found or inaccessible"""
     pass
 
 
@@ -400,7 +400,7 @@ def get_database_id(client, notion_id):
     try:
         # 尝试作为数据库检索（仅用于验证ID类型）
         # Try to retrieve as a database (validation only)
-        client.databases.retrieve(database_id=notion_id)
+        client.databases.retrieve(database_id=notion_id)  # Validation only - result discarded
         print(f"✓ 检测到数据库ID: {notion_id}")
         return notion_id
     except APIResponseError as e:
@@ -417,7 +417,7 @@ def get_database_id(client, notion_id):
     try:
         # 尝试作为页面检索（仅用于验证ID类型）
         # Try to retrieve as a page (validation only)
-        client.pages.retrieve(page_id=notion_id)
+        client.pages.retrieve(page_id=notion_id)  # Validation only - result discarded
         print(f"✓ 检测到页面ID，正在查找子数据库...")
     except APIResponseError as e:
         # 检查是否是权限或ID格式问题
@@ -443,6 +443,7 @@ def get_database_id(client, notion_id):
     # 页面中没有找到数据库
     # No database found in page
     raise DatabaseNotFoundError(f"页面 {notion_id} 中未找到数据库。请确保页面中包含至少一个数据库。")
+
 
 
 if __name__ == "__main__":
