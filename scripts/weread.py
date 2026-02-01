@@ -445,8 +445,6 @@ def get_database_id(client, notion_id):
     raise DatabaseNotFoundError(f"页面 {notion_id} 中未找到数据库。请确保页面中包含至少一个数据库。")
 
 
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     options = parser.parse_args()
