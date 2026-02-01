@@ -412,20 +412,13 @@ def get_database_id(client, notion_id):
         # Not a database ID, try as a page
         print("不是数据库ID，尝试作为页面处理...")
     
+    # 尝试作为页面处理
+    # Try to handle as a page
     try:
-        # 尝试作为页面检索，并查找子数据库（仅用于验证ID类型）
-        # Try to retrieve as a page and find child databases (validation only)
+        # 尝试作为页面检索（仅用于验证ID类型）
+        # Try to retrieve as a page (validation only)
         client.pages.retrieve(page_id=notion_id)
         print(f"✓ 检测到页面ID，正在查找子数据库...")
-        # 获取页面的子块
-        # Get the page's child blocks
-        blocks = client.blocks.children.list(block_id=notion_id)
-        for block in blocks.get("results", []):
-            if block.get("type") == "child_database":
-                database_id = block.get("id")
-                print(f"✓ 找到子数据库: {database_id}")
-                return database_id
-        raise DatabaseNotFoundError(f"页面 {notion_id} 中未找到数据库。请确保页面中包含至少一个数据库。")
     except APIResponseError as e:
         # 检查是否是权限或ID格式问题
         # Check if it's a permission or ID format issue
@@ -438,7 +431,18 @@ def get_database_id(client, notion_id):
             # Propagate other API errors
             raise
     
-    raise DatabaseNotFoundError(f"无法识别ID {notion_id} 的类型。请确保提供的是有效的Notion页面或数据库ID，并且已与集成共享。")
+    # 获取页面的子块并查找数据库
+    # Get the page's child blocks and find databases
+    blocks = client.blocks.children.list(block_id=notion_id)
+    for block in blocks.get("results", []):
+        if block.get("type") == "child_database":
+            database_id = block.get("id")
+            print(f"✓ 找到子数据库: {database_id}")
+            return database_id
+    
+    # 页面中没有找到数据库
+    # No database found in page
+    raise DatabaseNotFoundError(f"页面 {notion_id} 中未找到数据库。请确保页面中包含至少一个数据库。")
 
 
 
