@@ -27,8 +27,17 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -U notion-client
+          python -m pip uninstall -y notion-client notion-client-py notion_client notion || true
+          python -m pip install -r requirements.txt
+          python -m pip install "notion-client>=2.2.1"
+      - name: Assert notion-client API
+        run: |
+          python - << 'PY'
+          from notion_client import Client
+          c = Client(auth="dummy")
+          print("databases.query exists:", hasattr(c.databases, "query"))
+          print("notion_client file:", __import__("notion_client").__file__)
+          PY
       - name: weread sync
         run: |
           python scripts/weread.py
