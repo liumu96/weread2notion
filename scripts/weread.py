@@ -5,7 +5,7 @@ import os
 import re
 import time
 from notion_client import Client
-from notion_client.errors import APIResponseError
+from notion_client.errors import APIResponseError, APIErrorCode
 import requests
 from requests.utils import cookiejar_from_dict
 from http.cookies import SimpleCookie
@@ -403,7 +403,11 @@ def get_database_id(client, notion_id):
         client.databases.retrieve(database_id=notion_id)
         print(f"✓ 检测到数据库ID: {notion_id}")
         return notion_id
-    except APIResponseError:
+    except APIResponseError as e:
+        # 只捕获"对象未找到"错误，其他错误（如权限问题）应该向上传播
+        # Only catch "object not found" errors, other errors (like permission issues) should propagate
+        if e.code != APIErrorCode.ObjectNotFound:
+            raise
         # 不是数据库ID，尝试作为页面处理
         # Not a database ID, try as a page
         print("不是数据库ID，尝试作为页面处理...")
@@ -422,10 +426,19 @@ def get_database_id(client, notion_id):
                 print(f"✓ 找到子数据库: {database_id}")
                 return database_id
         raise DatabaseNotFoundError(f"页面 {notion_id} 中未找到数据库。请确保页面中包含至少一个数据库。")
-    except APIResponseError:
-        print("无法作为页面处理，请检查ID是否有效")
+    except APIResponseError as e:
+        # 检查是否是权限或ID格式问题
+        # Check if it's a permission or ID format issue
+        if e.code == APIErrorCode.Unauthorized:
+            raise Exception(f"无法访问ID {notion_id}：权限不足。请确保Notion集成已被授权访问该页面或数据库。")
+        elif e.code == APIErrorCode.ObjectNotFound:
+            raise DatabaseNotFoundError(f"找不到ID {notion_id}。请检查ID是否正确，以及Notion集成是否已被授权访问。")
+        else:
+            # 其他API错误向上传播
+            # Propagate other API errors
+            raise
     
-    raise Exception(f"无法识别ID {notion_id} 的类型。请确保提供的是有效的Notion页面或数据库ID，并且已与集成共享。")
+    raise DatabaseNotFoundError(f"无法识别ID {notion_id} 的类型。请确保提供的是有效的Notion页面或数据库ID，并且已与集成共享。")
 
 
 
