@@ -5,6 +5,7 @@ import os
 import re
 import time
 from notion_client import Client
+from notion_client.errors import APIResponseError, APIErrorCode
 import requests
 from requests.utils import cookiejar_from_dict
 from http.cookies import SimpleCookie
@@ -386,15 +387,76 @@ def extract_page_id():
     else:
         raise Exception(f"获取NotionID失败，请检查输入的Url是否正确")
 
+class DatabaseNotFoundError(Exception):
+    """数据库未找到或无法访问 / Database not found or inaccessible"""
+    pass
+
+
+def get_database_id(client, notion_id):
+    """
+    获取数据库ID。如果提供的是页面ID，则查找页面中的第一个子数据库。
+    Get database ID. If a page ID is provided, find the first child database in the page.
+    """
+    try:
+        # 尝试作为数据库检索（仅用于验证ID类型）
+        # Try to retrieve as a database (validation only)
+        client.databases.retrieve(database_id=notion_id)  # Validation only - result discarded
+        print(f"✓ 检测到数据库ID: {notion_id}")
+        return notion_id
+    except APIResponseError as e:
+        # 只捕获"对象未找到"错误，其他错误（如权限问题）应该向上传播
+        # Only catch "object not found" errors, other errors (like permission issues) should propagate
+        if e.code != APIErrorCode.ObjectNotFound:
+            raise
+        # 不是数据库ID，尝试作为页面处理
+        # Not a database ID, try as a page
+        print("不是数据库ID，尝试作为页面处理...")
+    
+    # 尝试作为页面处理
+    # Try to handle as a page
+    try:
+        # 尝试作为页面检索（仅用于验证ID类型）
+        # Try to retrieve as a page (validation only)
+        client.pages.retrieve(page_id=notion_id)  # Validation only - result discarded
+        print(f"✓ 检测到页面ID，正在查找子数据库...")
+    except APIResponseError as e:
+        # 检查是否是权限或ID格式问题
+        # Check if it's a permission or ID format issue
+        if e.code == APIErrorCode.Unauthorized:
+            raise Exception(f"无法访问ID {notion_id}：权限不足。请确保Notion集成已被授权访问该页面或数据库。")
+        elif e.code == APIErrorCode.ObjectNotFound:
+            raise DatabaseNotFoundError(f"找不到ID {notion_id}。请检查ID是否正确，以及Notion集成是否已被授权访问。")
+        else:
+            # 其他API错误向上传播
+            # Propagate other API errors
+            raise
+    
+    # 获取页面的子块并查找数据库
+    # Get the page's child blocks and find databases
+    blocks = client.blocks.children.list(block_id=notion_id)
+    for block in blocks.get("results", []):
+        if block.get("type") == "child_database":
+            database_id = block.get("id")
+            print(f"✓ 找到子数据库: {database_id}")
+            return database_id
+    
+    # 页面中没有找到数据库
+    # No database found in page
+    raise DatabaseNotFoundError(f"页面 {notion_id} 中未找到数据库。请确保页面中包含至少一个数据库。")
+
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     options = parser.parse_args()
     weread_cookie = get_cookie()
-    database_id = extract_page_id()
+    notion_id = extract_page_id()
     notion_token = os.getenv("NOTION_TOKEN")
     session = requests.Session()
     session.cookies = parse_cookie_string(weread_cookie)
     client = Client(auth=notion_token, log_level=logging.ERROR)
+    # 获取实际的数据库ID（处理页面ID和数据库ID两种情况）
+    database_id = get_database_id(client, notion_id)
     session.get(WEREAD_URL)
     latest_sort = get_sort()
     books = get_notebooklist()
